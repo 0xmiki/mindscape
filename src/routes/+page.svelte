@@ -34,9 +34,9 @@
 	const MIN_MEDIA_WIDTH = 120;
 	const MAX_MEDIA_WIDTH = 560;
 	const BASE_CANVAS_WIDTH = 1800;
-	const BASE_CANVAS_HEIGHT = 1200;
 	const BASE_ORIGIN_X = 900;
-	const BASE_ORIGIN_Y = 600;
+	const LEGACY_BASE_CANVAS_HEIGHT = 1200;
+	const LEGACY_BASE_ORIGIN_Y = 600;
 	const CANVAS_EXPANSION = 280;
 	const MARKDOWN_PLACEHOLDER =
 		'# Name this idea\n\nWrite what it means, why it matters, and where it might lead…';
@@ -53,9 +53,10 @@
 	let isSaving = $state(false);
 	let loadError = $state('');
 	let canvasWidth = $state(BASE_CANVAS_WIDTH);
-	let canvasHeight = $state(BASE_CANVAS_HEIGHT);
+	let baseCanvasHeight = $state(0);
+	let canvasHeight = $state(0);
 	let originX = $state(BASE_ORIGIN_X);
-	let originY = $state(BASE_ORIGIN_Y);
+	let originY = $state(0);
 	let resizeState: { id: string; startX: number; startWidth: number } | null = $state(null);
 	let layoutSave: Promise<void> = Promise.resolve();
 	let savedScrollX: number | null = null;
@@ -502,13 +503,13 @@
 				empty = canvasWidth - originX - nearestMind - margin;
 			}
 		} else if (direction === 'top') {
-			added = originY - BASE_ORIGIN_Y;
+			added = originY - baseCanvasHeight / 2;
 			if (mindBounds.length) {
 				const nearestMind = Math.min(...mindBounds.map((item) => item.top));
 				empty = nearestMind - margin + originY;
 			}
 		} else {
-			added = canvasHeight - originY - (BASE_CANVAS_HEIGHT - BASE_ORIGIN_Y);
+			added = canvasHeight - originY - baseCanvasHeight / 2;
 			if (mindBounds.length) {
 				const nearestMind = Math.max(...mindBounds.map((item) => item.bottom));
 				empty = canvasHeight - originY - nearestMind - margin;
@@ -589,14 +590,28 @@
 		localStorage.setItem(
 			'mindscape-canvas',
 			JSON.stringify({
+				version: 2,
 				width: canvasWidth,
 				height: canvasHeight,
 				originX,
 				originY,
+				extraTop: Math.max(0, originY - baseCanvasHeight / 2),
+				extraBottom: Math.max(0, canvasHeight - originY - baseCanvasHeight / 2),
 				scrollX: canvasViewport.scrollLeft,
 				scrollY: canvasViewport.scrollTop
 			})
 		);
+	}
+
+	function fitCanvasHeightToViewport() {
+		if (!canvasViewport) return;
+		const nextBaseHeight = Math.max(1, canvasViewport.clientHeight);
+		const extraTop = Math.max(0, originY - baseCanvasHeight / 2);
+		const extraBottom = Math.max(0, canvasHeight - originY - baseCanvasHeight / 2);
+		baseCanvasHeight = nextBaseHeight;
+		canvasHeight = nextBaseHeight + extraTop + extraBottom;
+		originY = nextBaseHeight / 2 + extraTop;
+		saveCanvas();
 	}
 
 	function rememberCanvasScroll() {
@@ -605,21 +620,39 @@
 	}
 
 	onMount(() => {
+		baseCanvasHeight = Math.max(1, canvasViewport.clientHeight);
+		canvasHeight = baseCanvasHeight;
+		originY = baseCanvasHeight / 2;
+
 		try {
 			const savedCanvas = JSON.parse(localStorage.getItem('mindscape-canvas') || 'null');
-			if (
-				Number.isFinite(savedCanvas?.width) &&
-				Number.isFinite(savedCanvas?.height) &&
-				Number.isFinite(savedCanvas?.originX) &&
-				Number.isFinite(savedCanvas?.originY)
-			) {
+			if (Number.isFinite(savedCanvas?.width) && Number.isFinite(savedCanvas?.originX)) {
 				canvasWidth = Math.max(BASE_CANVAS_WIDTH, savedCanvas.width);
-				canvasHeight = Math.max(BASE_CANVAS_HEIGHT, savedCanvas.height);
 				originX = Math.max(BASE_ORIGIN_X, savedCanvas.originX);
-				originY = Math.max(BASE_ORIGIN_Y, savedCanvas.originY);
-				savedScrollX = Number.isFinite(savedCanvas.scrollX) ? savedCanvas.scrollX : null;
-				savedScrollY = Number.isFinite(savedCanvas.scrollY) ? savedCanvas.scrollY : null;
 			}
+
+			let extraTop = 0;
+			let extraBottom = 0;
+			if (
+				savedCanvas?.version === 2 &&
+				Number.isFinite(savedCanvas.extraTop) &&
+				Number.isFinite(savedCanvas.extraBottom)
+			) {
+				extraTop = Math.max(0, savedCanvas.extraTop);
+				extraBottom = Math.max(0, savedCanvas.extraBottom);
+			} else if (Number.isFinite(savedCanvas?.height) && Number.isFinite(savedCanvas?.originY)) {
+				extraTop = Math.max(0, savedCanvas.originY - LEGACY_BASE_ORIGIN_Y);
+				extraBottom = Math.max(
+					0,
+					savedCanvas.height -
+						savedCanvas.originY -
+						(LEGACY_BASE_CANVAS_HEIGHT - LEGACY_BASE_ORIGIN_Y)
+				);
+			}
+			canvasHeight = baseCanvasHeight + extraTop + extraBottom;
+			originY = baseCanvasHeight / 2 + extraTop;
+			savedScrollX = Number.isFinite(savedCanvas?.scrollX) ? savedCanvas.scrollX : null;
+			savedScrollY = Number.isFinite(savedCanvas?.scrollY) ? savedCanvas.scrollY : null;
 		} catch {
 			// A malformed canvas value should never prevent the mindscape from loading.
 		}
@@ -641,6 +674,7 @@
 		window.addEventListener('keydown', handleKeys);
 		window.addEventListener('pointermove', resizeMind);
 		window.addEventListener('pointerup', finishResize);
+		window.addEventListener('resize', fitCanvasHeightToViewport);
 		window.addEventListener('pagehide', saveCanvas);
 		return () => {
 			cancelAnimationFrame(scrollSaveFrame);
@@ -649,6 +683,7 @@
 			window.removeEventListener('keydown', handleKeys);
 			window.removeEventListener('pointermove', resizeMind);
 			window.removeEventListener('pointerup', finishResize);
+			window.removeEventListener('resize', fitCanvasHeightToViewport);
 			window.removeEventListener('pagehide', saveCanvas);
 		};
 	});

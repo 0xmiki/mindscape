@@ -84,7 +84,7 @@ textarea:focus-visible {
 .canvas-space {
 	position: relative;
 	min-width: 100%;
-	min-height: 100%;
+	overflow: clip;
 	background:
 		radial-gradient(
 			circle at 52% 44%,
@@ -774,6 +774,26 @@ textarea:focus-visible {
 .markdown-body ul,
 .markdown-body ol {
 	padding-left: 1.4em;
+}
+
+.markdown-body ul {
+	list-style: disc outside;
+}
+
+.markdown-body ol {
+	list-style: decimal outside;
+}
+
+.markdown-body ul ul {
+	list-style-type: circle;
+}
+
+.markdown-body ul ul ul {
+	list-style-type: square;
+}
+
+.markdown-body li::marker {
+	color: #777;
 }
 
 .markdown-body li + li {
