@@ -868,6 +868,17 @@ textarea:focus-visible {
 	flex: 1;
 }
 
+.idea-document,
+.idea-panel {
+	-ms-overflow-style: none;
+	scrollbar-width: none;
+}
+
+.idea-document::-webkit-scrollbar,
+.idea-panel::-webkit-scrollbar {
+	display: none;
+}
+
 .idea-document.markdown-body h1 {
 	font-size: clamp(1.5rem, 2.3vw, 2rem);
 }
