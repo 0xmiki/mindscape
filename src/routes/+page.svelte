@@ -16,6 +16,7 @@
 		worldY: number;
 		width: number;
 		aspectRatio: number;
+		borderRadius: number;
 		tilt: number;
 		createdAt: number;
 	};
@@ -33,6 +34,8 @@
 	const EDGE_OVERLAP = 12;
 	const MIN_MEDIA_WIDTH = 120;
 	const MAX_MEDIA_WIDTH = 560;
+	const DEFAULT_BORDER_RADIUS_PERCENT = 4;
+	const MAX_BORDER_RADIUS_PERCENT = 100;
 	const BASE_CANVAS_WIDTH = 1800;
 	const BASE_ORIGIN_X = 900;
 	const LEGACY_BASE_CANVAS_HEIGHT = 1200;
@@ -48,7 +51,9 @@
 	let draftImage = $state('');
 	let draftMediaType: 'image' | 'video' = $state('image');
 	let draftAspectRatio = $state(4 / 3);
+	let draftBorderRadius = $state(DEFAULT_BORDER_RADIUS_PERCENT);
 	let draftIdea = $state('');
+	let radiusPreviewVisible = $state(false);
 	let isDragging = $state(false);
 	let isSaving = $state(false);
 	let loadError = $state('');
@@ -62,6 +67,7 @@
 	let savedScrollX: number | null = null;
 	let savedScrollY: number | null = null;
 	let scrollSaveFrame = 0;
+	let radiusPreviewTimer: ReturnType<typeof setTimeout> | undefined;
 	let fileInput: HTMLInputElement = $state()!;
 	let ideaInput: HTMLTextAreaElement = $state()!;
 	let canvasViewport: HTMLElement = $state()!;
@@ -165,6 +171,9 @@
 				Number.isFinite(mind.aspectRatio) && Number(mind.aspectRatio) > 0
 					? Number(mind.aspectRatio)
 					: 4 / 3,
+			borderRadius: Number.isFinite(mind.borderRadius)
+				? Math.max(0, Math.min(MAX_BORDER_RADIUS_PERCENT, Number(mind.borderRadius)))
+				: DEFAULT_BORDER_RADIUS_PERCENT,
 			tilt: mind.tilt,
 			createdAt: mind.createdAt
 		};
@@ -244,7 +253,9 @@
 		draftImage = '';
 		draftMediaType = 'image';
 		draftAspectRatio = 4 / 3;
+		draftBorderRadius = DEFAULT_BORDER_RADIUS_PERCENT;
 		draftIdea = '';
+		hideRadiusPreview();
 		loadError = '';
 		composing = true;
 		void tick().then(() => ideaInput?.focus());
@@ -252,12 +263,43 @@
 
 	function closeComposer() {
 		if (isSaving) return;
+		hideRadiusPreview();
 		composing = false;
 		editingMindId = null;
 	}
 
+	function holdRadiusPreview() {
+		if (radiusPreviewTimer) clearTimeout(radiusPreviewTimer);
+		radiusPreviewVisible = true;
+	}
+
+	function showRadiusPreview(event: Event) {
+		draftBorderRadius = Number((event.currentTarget as HTMLInputElement).value);
+		holdRadiusPreview();
+		radiusPreviewTimer = setTimeout(() => {
+			radiusPreviewVisible = false;
+		}, 850);
+	}
+
+	function releaseRadiusPreview() {
+		if (radiusPreviewTimer) clearTimeout(radiusPreviewTimer);
+		radiusPreviewTimer = setTimeout(() => {
+			radiusPreviewVisible = false;
+		}, 450);
+	}
+
+	function hideRadiusPreview() {
+		if (radiusPreviewTimer) clearTimeout(radiusPreviewTimer);
+		radiusPreviewTimer = undefined;
+		radiusPreviewVisible = false;
+	}
+
+	function displayedAspectRatio(aspectRatio: number, borderRadius: number) {
+		return borderRadius >= MAX_BORDER_RADIUS_PERCENT ? 1 : aspectRatio;
+	}
+
 	function bounds(mind: Mind) {
-		const height = mind.width / mind.aspectRatio;
+		const height = mind.width / displayedAspectRatio(mind.aspectRatio, mind.borderRadius);
 		return {
 			left: mind.worldX - mind.width / 2,
 			right: mind.worldX + mind.width / 2,
@@ -275,14 +317,14 @@
 		return horizontal > EDGE_OVERLAP && vertical > EDGE_OVERLAP;
 	}
 
-	function findOpenPosition(width: number, aspectRatio: number) {
+	function findOpenPosition(width: number, aspectRatio: number, borderRadius: number) {
 		const centerX = canvasViewport
 			? canvasViewport.scrollLeft + canvasViewport.clientWidth / 2 - originX
 			: 0;
 		const centerY = canvasViewport
 			? canvasViewport.scrollTop + canvasViewport.clientHeight / 2 - originY
 			: 0;
-		const height = width / aspectRatio;
+		const height = width / displayedAspectRatio(aspectRatio, borderRadius);
 		const minX = -originX + width / 2 + 36;
 		const maxX = canvasWidth - originX - width / 2 - 36;
 		const minY = -originY + height / 2 + 36;
@@ -299,6 +341,7 @@
 				worldY: Math.max(minY, Math.min(maxY, centerY + Math.sin(angle) * radius)),
 				width,
 				aspectRatio,
+				borderRadius,
 				tilt: 0,
 				createdAt: 0
 			};
@@ -371,7 +414,8 @@
 				image: draftImage,
 				mediaType: draftMediaType,
 				idea: draftIdea.trim(),
-				aspectRatio: draftAspectRatio
+				aspectRatio: draftAspectRatio,
+				borderRadius: draftBorderRadius
 			};
 			const updatedMinds = resolveCollisions(
 				minds.map((mind) => (mind.id === updated.id ? updated : mind)),
@@ -393,7 +437,7 @@
 		}
 
 		const width = 190 + ((minds.length * 37) % 110);
-		const placement = findOpenPosition(width, draftAspectRatio);
+		const placement = findOpenPosition(width, draftAspectRatio, draftBorderRadius);
 		const mind: Mind = {
 			id: crypto.randomUUID(),
 			image: draftImage,
@@ -402,6 +446,7 @@
 			...placement,
 			width,
 			aspectRatio: draftAspectRatio,
+			borderRadius: draftBorderRadius,
 			tilt: -2.5 + ((minds.length * 17) % 50) / 10,
 			createdAt: Date.now()
 		};
@@ -561,6 +606,7 @@
 		draftImage = mind.image;
 		draftMediaType = isVideo(mind) ? 'video' : 'image';
 		draftAspectRatio = mind.aspectRatio;
+		draftBorderRadius = mind.borderRadius;
 		draftIdea = mind.idea;
 		loadError = '';
 		closeViewer();
@@ -678,6 +724,7 @@
 		window.addEventListener('pagehide', saveCanvas);
 		return () => {
 			cancelAnimationFrame(scrollSaveFrame);
+			if (radiusPreviewTimer) clearTimeout(radiusPreviewTimer);
 			saveCanvas();
 			window.removeEventListener('paste', onPaste);
 			window.removeEventListener('keydown', handleKeys);
@@ -715,7 +762,13 @@
 					class:resizing={resizeState?.id === mind.id}
 					style={`left:${mind.worldX}px; top:${mind.worldY}px; width:${mind.width}px; --tilt:${mind.tilt}deg; --delay:${-(index % 8) * 1.3}s`}
 				>
-					<button class="floating-mind" onclick={() => openMind(mind)} aria-label="Open idea">
+					<button
+						class="floating-mind"
+						class:circular={mind.borderRadius >= MAX_BORDER_RADIUS_PERCENT}
+						style={`--media-radius:${mind.borderRadius}%`}
+						onclick={() => openMind(mind)}
+						aria-label="Open idea"
+					>
 						{#if isVideo(mind)}
 							<video
 								src={mind.image}
@@ -861,7 +914,10 @@
 						{#if draftImage}
 							<button
 								class="remove-attachment"
-								onclick={() => (draftImage = '')}
+								onclick={() => {
+									draftImage = '';
+									hideRadiusPreview();
+								}}
 								aria-label="Remove attached media"
 							>
 								<svg viewBox="0 0 24 24" aria-hidden="true">
@@ -889,6 +945,28 @@
 					event.currentTarget.value = '';
 				}}
 			/>
+
+			{#if draftImage}
+				<div class="media-settings">
+					<label class="radius-setting" for="media-border-radius">
+						<span>Corner radius</span>
+						<input
+							id="media-border-radius"
+							type="range"
+							min="0"
+							max={MAX_BORDER_RADIUS_PERCENT}
+							step="1"
+							value={draftBorderRadius}
+							oninput={showRadiusPreview}
+							onpointerdown={holdRadiusPreview}
+							onpointerup={releaseRadiusPreview}
+							onpointercancel={releaseRadiusPreview}
+							onblur={releaseRadiusPreview}
+						/>
+						<output for="media-border-radius">{draftBorderRadius}%</output>
+					</label>
+				</div>
+			{/if}
 
 			<div class="document-workspace">
 				<section
@@ -932,6 +1010,25 @@
 					</div>
 				</section>
 			</div>
+
+			{#if radiusPreviewVisible && draftImage}
+				<div class="radius-preview-layer" aria-hidden="true">
+					<div class="radius-preview-wrap">
+						<div
+							class="radius-preview-media"
+							class:circular={draftBorderRadius >= MAX_BORDER_RADIUS_PERCENT}
+							style={`--preview-radius:${draftBorderRadius}%; aspect-ratio:${displayedAspectRatio(draftAspectRatio, draftBorderRadius)}`}
+						>
+							{#if draftMediaType === 'video'}
+								<video src={draftImage} autoplay muted loop playsinline></video>
+							{:else}
+								<img src={draftImage} alt="" />
+							{/if}
+						</div>
+						<output>{draftBorderRadius}% radius</output>
+					</div>
+				</div>
+			{/if}
 		</div>
 	</div>
 {/if}

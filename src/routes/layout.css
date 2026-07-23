@@ -149,7 +149,7 @@ textarea:focus-visible {
 	padding: 0;
 	overflow: hidden;
 	border: 0;
-	border-radius: 8px;
+	border-radius: var(--media-radius, 4%);
 	background: #090909;
 	box-shadow: 0 22px 65px rgba(0, 0, 0, 0.72);
 	cursor: zoom-in;
@@ -168,6 +168,17 @@ textarea:focus-visible {
 	transition:
 		filter 350ms ease,
 		transform 700ms cubic-bezier(0.2, 0.75, 0.2, 1);
+}
+
+.floating-mind.circular {
+	aspect-ratio: 1;
+	border-radius: 50%;
+}
+
+.floating-mind.circular img,
+.floating-mind.circular video {
+	height: 100%;
+	object-fit: cover;
 }
 
 .floating-mind:hover {
@@ -478,6 +489,101 @@ textarea:focus-visible {
 	width: 100%;
 	height: 100%;
 	object-fit: cover;
+}
+
+.media-settings {
+	display: flex;
+	height: 44px;
+	align-items: center;
+	padding: 0 clamp(18px, 2.5vw, 38px);
+	border-bottom: 1px solid #1c1c1c;
+	background: #080808;
+	flex: 0 0 auto;
+}
+
+.radius-setting {
+	display: flex;
+	width: min(100%, 500px);
+	align-items: center;
+	gap: 12px;
+	color: #777;
+	font-size: 0.68rem;
+	font-weight: 600;
+	letter-spacing: 0.1em;
+	text-transform: uppercase;
+}
+
+.radius-setting input[type='range'] {
+	width: min(280px, 30vw);
+	height: 18px;
+	margin: 0;
+	padding: 0;
+	accent-color: #bdbdbd;
+	background: transparent;
+	box-shadow: none;
+	cursor: ew-resize;
+	flex: 1;
+}
+
+.radius-setting output {
+	width: 42px;
+	color: #aaa;
+	font-family: 'SFMono-Regular', Consolas, 'Liberation Mono', monospace;
+	font-weight: 400;
+	letter-spacing: 0;
+	text-align: right;
+	text-transform: none;
+}
+
+.radius-preview-layer {
+	position: fixed;
+	inset: 64px 0 0;
+	z-index: 70;
+	display: grid;
+	padding: 24px;
+	pointer-events: none;
+	place-items: center;
+	background: rgba(0, 0, 0, 0.62);
+	animation: veil-in 100ms ease-out;
+}
+
+.radius-preview-wrap {
+	display: grid;
+	width: min(340px, calc(100vw - 48px));
+	justify-items: center;
+	gap: 12px;
+}
+
+.radius-preview-media {
+	display: grid;
+	width: 100%;
+	max-height: 62svh;
+	overflow: hidden;
+	border-radius: var(--preview-radius);
+	place-items: center;
+	background: #070707;
+	box-shadow: 0 28px 90px rgba(0, 0, 0, 0.75);
+	transition: border-radius 70ms linear;
+}
+
+.radius-preview-media.circular {
+	border-radius: 50%;
+}
+
+.radius-preview-media img,
+.radius-preview-media video {
+	display: block;
+	width: 100%;
+	height: 100%;
+	object-fit: cover;
+}
+
+.radius-preview-wrap > output {
+	padding: 5px 8px;
+	color: #aaa;
+	background: #090909;
+	font-family: 'SFMono-Regular', Consolas, 'Liberation Mono', monospace;
+	font-size: 0.68rem;
 }
 
 .document-actions {
@@ -1008,6 +1114,24 @@ textarea:focus-visible {
 
 	.document-media-button > svg {
 		margin-left: 0;
+	}
+
+	.media-settings {
+		padding: 0 14px;
+	}
+
+	.radius-setting {
+		width: 100%;
+		gap: 9px;
+	}
+
+	.radius-setting input[type='range'] {
+		width: auto;
+	}
+
+	.radius-preview-layer {
+		inset: 58px 0 0;
+		padding: 18px;
 	}
 
 	.document-actions .cancel-button,
